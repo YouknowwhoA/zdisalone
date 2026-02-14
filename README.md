@@ -33,3 +33,9 @@ Smoother motion (denser + smoothed path):
 ```bash
 python3 src/astar_animate.py --mode frames --random-map --random-tie-break --obstacle 0.25 --interp 4 --smooth-rounds 2 --dt 0.2 --vmax 1.5 --amax 1.0
 ```
+
+Realtime replan demo with a moving obstacle:
+
+```bash
+python3 src/astar_animate.py --dynamic-obs --delay 0.2 --replan-every 3
+```

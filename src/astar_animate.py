@@ -90,13 +90,16 @@ def render_grid(
     start: Coord,
     goal: Coord,
     drone: Optional[Coord],
+    dynamic_obs: Optional[Coord] = None,
 ) -> str:
     path_set = set(path or [])
     lines: List[str] = []
     for r, row in enumerate(grid):
         line = []
         for c, cell in enumerate(row):
-            if drone is not None and (r, c) == drone:
+            if dynamic_obs is not None and (r, c) == dynamic_obs:
+                line.append("X")
+            elif drone is not None and (r, c) == drone:
                 line.append("D")
             elif (r, c) == start:
                 line.append("S")
@@ -335,9 +338,10 @@ def animate_clear(
     start: Coord,
     goal: Coord,
     delay: float,
+    dynamic_obs: Optional[Coord] = None,
 ) -> None:
     for i, point in enumerate(path):
-        frame = render_grid(grid, path, start, goal, point)
+        frame = render_grid(grid, path, start, goal, point, dynamic_obs=dynamic_obs)
         clear_screen()
         print(frame)
         print(f"\nStep {i + 1}/{len(path)}  Drone at {point}")
@@ -351,9 +355,10 @@ def animate_frames(
     goal: Coord,
     delay: float,
     step: bool,
+    dynamic_obs: Optional[Coord] = None,
 ) -> None:
     for i, point in enumerate(path):
-        frame = render_grid(grid, path, start, goal, point)
+        frame = render_grid(grid, path, start, goal, point, dynamic_obs=dynamic_obs)
         print(f"\n--- Frame {i + 1}/{len(path)}  Drone at {point} ---")
         print(frame)
         if step:
@@ -436,6 +441,17 @@ def main() -> None:
         default=1.0,
         help="max accel (cells per second^2)",
     )
+    parser.add_argument(
+        "--dynamic-obs",
+        action="store_true",
+        help="enable a simple moving obstacle and replan in real time",
+    )
+    parser.add_argument(
+        "--replan-every",
+        type=int,
+        default=3,
+        help="replan every N steps when dynamic obstacle is on",
+    )
     args = parser.parse_args()
     if args.seed is not None:
         random.seed(args.seed)
@@ -473,15 +489,60 @@ def main() -> None:
     dense = densify_path(smooth, max(1, args.interp))
     if dense != path:
         export_path_named(dense, Path("outputs"), "path_points_smooth", args.dt, args.vmax, args.amax)
-    if args.mode == "clear":
-        animate_clear(grid, dense, start, goal, args.delay)
-    else:
-        animate_frames(grid, dense, start, goal, args.delay, args.step)
-    length = path_length(dense)
-    samples = time_parameterize(dense, vmax=args.vmax, amax=args.amax, dt=args.dt)
-    total_time = samples[-1]["t_sec"] if samples else 0.0
-    print(f"\nTrajectory length (cells): {length:.2f}")
-    print(f"Estimated time (s): {total_time:.2f}")
+
+    if not args.dynamic_obs:
+        if args.mode == "clear":
+            animate_clear(grid, dense, start, goal, args.delay)
+        else:
+            animate_frames(grid, dense, start, goal, args.delay, args.step)
+        length = path_length(dense)
+        samples = time_parameterize(dense, vmax=args.vmax, amax=args.amax, dt=args.dt)
+        total_time = samples[-1]["t_sec"] if samples else 0.0
+        print(f"\nTrajectory length (cells): {length:.2f}")
+        print(f"Estimated time (s): {total_time:.2f}")
+        return
+
+    # --- Dynamic obstacle demo with periodic replan ---
+    # Simple obstacle: moves horizontally across row 3.
+    obs_row = min(3, args.rows - 2)
+    obs_cols = list(range(1, args.cols - 1))
+    obs_index = 0
+    current = start
+    steps = 0
+
+    while current != goal:
+        # Update dynamic obstacle position
+        obs = (obs_row, obs_cols[obs_index])
+        obs_index = (obs_index + 1) % len(obs_cols)
+
+        # Build a planning grid that includes the moving obstacle
+        planning_grid = [row[:] for row in grid]
+        planning_grid[obs[0]][obs[1]] = 1
+
+        # Replan periodically or at the beginning
+        if steps % max(1, args.replan_every) == 0:
+            planned = astar(planning_grid, current, goal, args.random_tie_break)
+            if not planned:
+                print("No path found during replan.")
+                break
+            # Skip current position in the path
+            planned = planned[1:]
+
+        if not planned:
+            print("No steps left in plan.")
+            break
+
+        next_step = planned.pop(0)
+        current = next_step
+        steps += 1
+
+        frame = render_grid(grid, None, start, goal, current, dynamic_obs=obs)
+        clear_screen()
+        print(frame)
+        print(f"\nRealtime step {steps}  Drone at {current}  Obstacle at {obs}")
+        time.sleep(args.delay)
+
+    print("\nDynamic obstacle demo complete.")
     print("\nExported:")
     print("outputs/path_points.csv")
     print("outputs/path_points.json")
