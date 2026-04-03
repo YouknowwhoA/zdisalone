@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agent Command Console</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="brand">
+          <div class="logo"></div>
+          <div>
+            <div class="title">Agent Command Console</div>
+            <div class="subtitle">Tactical view of your AI squad</div>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button id="add-agent" class="btn ghost">Add Mock Agent</button>
+          <button id="clear-mocks" class="btn ghost">Clear Mock Agents</button>
+          <button id="connect" class="btn">Sync Adapter</button>
+        </div>
+      </header>
+
+      <main class="grid">
+        <section class="panel roster">
+          <h2>Roster</h2>
+          <div id="roster" class="roster-list"></div>
+        </section>
+
+        <section class="panel map">
+          <div class="map-header">
+            <h2>Tactical Map</h2>
+            <div class="map-legend">
+              <span class="legend-dot idle"></span> Idle
+              <span class="legend-dot running"></span> Running
+              <span class="legend-dot error"></span> Error
+            </div>
+          </div>
+          <div id="map" class="map-surface">
+            <div class="grid-lines"></div>
+            <div id="map-blips" class="map-blips"></div>
+          </div>
+          <div class="map-footer">
+            <div class="chip">Nodes online: <span id="online-count">0</span></div>
+            <div class="chip">Tasks queued: <span id="queue-count">0</span></div>
+          </div>
+        </section>
+
+        <section class="panel control">
+          <h2>Control</h2>
+          <div id="selected" class="selected-card">
+            <div class="selected-title">No agent selected</div>
+            <div class="selected-sub">Select an agent to dispatch a task.</div>
+          </div>
+
+          <label class="field">
+            <span>Task</span>
+            <input id="task-input" type="text" placeholder="e.g., summarize repo status" />
+          </label>
+
+          <div class="button-row">
+            <button id="dispatch" class="btn">Dispatch Task</button>
+            <button id="simulate" class="btn ghost">Spawn Mock Agent</button>
+          </div>
+
+          <div class="metrics">
+            <h3>Token / Cost</h3>
+            <div class="metrics-grid">
+              <div class="metric">
+                <span class="metric-label">Input tokens</span>
+                <span id="tokens-in" class="metric-value">0</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Output tokens</span>
+                <span id="tokens-out" class="metric-value">0</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Total cost</span>
+                <span id="cost-total" class="metric-value">$0.00</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Last task</span>
+                <span id="tokens-last" class="metric-value">0</span>
+              </div>
+            </div>
+
+            <div class="price-row">
+              <label class="field compact">
+                <span>Price in (per 1K)</span>
+                <input id="price-in" type="number" min="0" step="0.001" placeholder="0.000" />
+              </label>
+              <label class="field compact">
+                <span>Price out (per 1K)</span>
+                <input id="price-out" type="number" min="0" step="0.001" placeholder="0.000" />
+              </label>
+            </div>
+          </div>
+
+          <div class="skills">
+            <h3>Skill Tree</h3>
+            <div class="skill-summary">
+              <span>Skill points: <strong id="skill-points">0</strong></span>
+              <span>Primary branch: <strong id="skill-branch">-</strong></span>
+              <button id="reset-tree" class="btn ghost mini">Reset Tree</button>
+            </div>
+            <div class="skill-hint">Click a node to upgrade. Locked nodes require prerequisites.</div>
+            <div id="skill-tree" class="skill-tree"></div>
+          </div>
+        </section>
+
+        <section class="panel log">
+          <h2>Activity Log</h2>
+          <div id="log" class="log-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

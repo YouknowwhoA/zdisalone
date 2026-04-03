@@ -39,3 +39,9 @@ Realtime replan demo with a moving obstacle:
 ```bash
 python3 src/astar_animate.py --dynamic-obs --delay 0.2 --replan-every 3
 ```
+
+PID path tracking (control loop following the planned path):
+
+```bash
+python3 src/astar_animate.py --mode frames --random-map --random-tie-break --obstacle 0.25 --interp 4 --smooth-rounds 2 --pid-follow --kp 1.2 --kd 0.4 --ki 0.0
+```

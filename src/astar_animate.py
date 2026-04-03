@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import random
 import sys
 import time
@@ -367,6 +368,150 @@ def animate_frames(
             time.sleep(delay)
 
 
+def animate_trace(
+    grid: List[List[int]],
+    path: List[Coord],
+    trace: List[Dict[str, float]],
+    start: Coord,
+    goal: Coord,
+    delay: float,
+    step: bool,
+    clear: bool,
+) -> None:
+    for i, s in enumerate(trace):
+        drone = (int(round(s["row"])), int(round(s["col"])))
+        frame = render_grid(grid, path, start, goal, drone)
+        if clear:
+            clear_screen()
+        print(f"\n--- Frame {i + 1}/{len(trace)}  Drone at {drone} ---")
+        print(frame)
+        print(f"t={s['t_sec']:.2f}s  err={s['err']:.3f}  speed={s['speed']:.3f}")
+        if step:
+            input("Press Enter for next frame...")
+        else:
+            time.sleep(delay)
+
+
+def export_tracking(trace: List[Dict[str, float]], out_dir: Path) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    csv_path = out_dir / "tracking_log.csv"
+    json_path = out_dir / "tracking_log.json"
+
+    with csv_path.open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["step", "t_sec", "row", "col", "vx", "vy", "speed", "err", "target_index"])
+        for s in trace:
+            writer.writerow(
+                [
+                    s["step"],
+                    s["t_sec"],
+                    s["row"],
+                    s["col"],
+                    s["vx"],
+                    s["vy"],
+                    s["speed"],
+                    s["err"],
+                    s["target_index"],
+                ]
+            )
+
+    with json_path.open("w") as f:
+        json.dump(trace, f, indent=2)
+
+
+def simulate_pid_following(
+    path: List[Coord],
+    dt: float,
+    kp: float,
+    kd: float,
+    ki: float,
+    vmax: float,
+    amax: float,
+    tol: float,
+    max_steps: int,
+) -> List[Dict[str, float]]:
+    if not path:
+        return []
+
+    pos = [float(path[0][0]), float(path[0][1])]
+    vel = [0.0, 0.0]
+    i_err = [0.0, 0.0]
+    prev_err = [0.0, 0.0]
+
+    target_index = 0
+    trace: List[Dict[str, float]] = []
+    for step in range(max_steps):
+        target = path[target_index]
+        err = [target[0] - pos[0], target[1] - pos[1]]
+        dist = math.hypot(err[0], err[1])
+
+        if dist < tol:
+            if target_index >= len(path) - 1:
+                vel[0] *= 0.6
+                vel[1] *= 0.6
+                pos[0] += vel[0] * dt
+                pos[1] += vel[1] * dt
+                speed = math.hypot(vel[0], vel[1])
+                trace.append(
+                    {
+                        "step": step,
+                        "t_sec": round(step * dt, 3),
+                        "row": pos[0],
+                        "col": pos[1],
+                        "vx": vel[0],
+                        "vy": vel[1],
+                        "speed": speed,
+                        "err": dist,
+                        "target_index": target_index,
+                    }
+                )
+                if speed < 0.05:
+                    break
+            else:
+                target_index += 1
+            continue
+
+        i_err[0] += err[0] * dt
+        i_err[1] += err[1] * dt
+        d_err = [(err[0] - prev_err[0]) / dt, (err[1] - prev_err[1]) / dt]
+
+        ax = kp * err[0] + kd * d_err[0] + ki * i_err[0]
+        ay = kp * err[1] + kd * d_err[1] + ki * i_err[1]
+
+        a_mag = math.hypot(ax, ay)
+        if a_mag > amax:
+            ax *= amax / a_mag
+            ay *= amax / a_mag
+
+        vel[0] += ax * dt
+        vel[1] += ay * dt
+
+        v_mag = math.hypot(vel[0], vel[1])
+        if v_mag > vmax:
+            vel[0] *= vmax / v_mag
+            vel[1] *= vmax / v_mag
+
+        pos[0] += vel[0] * dt
+        pos[1] += vel[1] * dt
+        prev_err = err
+
+        trace.append(
+            {
+                "step": step,
+                "t_sec": round(step * dt, 3),
+                "row": pos[0],
+                "col": pos[1],
+                "vx": vel[0],
+                "vy": vel[1],
+                "speed": v_mag,
+                "err": dist,
+                "target_index": target_index,
+            }
+        )
+
+    return trace
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="A* path planning animation")
     parser.add_argument(
@@ -442,6 +587,21 @@ def main() -> None:
         help="max accel (cells per second^2)",
     )
     parser.add_argument(
+        "--pid-follow",
+        action="store_true",
+        help="use a PID controller to track the path",
+    )
+    parser.add_argument("--kp", type=float, default=1.2, help="PID Kp")
+    parser.add_argument("--kd", type=float, default=0.4, help="PID Kd")
+    parser.add_argument("--ki", type=float, default=0.0, help="PID Ki")
+    parser.add_argument("--pid-tol", type=float, default=0.15, help="target tolerance (cells)")
+    parser.add_argument(
+        "--pid-max-steps",
+        type=int,
+        default=800,
+        help="max steps for PID simulation",
+    )
+    parser.add_argument(
         "--dynamic-obs",
         action="store_true",
         help="enable a simple moving obstacle and replan in real time",
@@ -489,6 +649,34 @@ def main() -> None:
     dense = densify_path(smooth, max(1, args.interp))
     if dense != path:
         export_path_named(dense, Path("outputs"), "path_points_smooth", args.dt, args.vmax, args.amax)
+
+    if args.pid_follow:
+        trace = simulate_pid_following(
+            dense,
+            dt=args.dt,
+            kp=args.kp,
+            kd=args.kd,
+            ki=args.ki,
+            vmax=args.vmax,
+            amax=args.amax,
+            tol=args.pid_tol,
+            max_steps=args.pid_max_steps,
+        )
+        export_tracking(trace, Path("outputs"))
+        animate_trace(
+            grid,
+            dense,
+            trace,
+            start,
+            goal,
+            args.delay,
+            args.step,
+            clear=(args.mode == "clear"),
+        )
+        print("\nExported:")
+        print("outputs/tracking_log.csv")
+        print("outputs/tracking_log.json")
+        return
 
     if not args.dynamic_obs:
         if args.mode == "clear":
