@@ -1,47 +1,23 @@
-# Drone Path Planning (Simulation)
+# Archived Monorepo
 
-Goal: Fly a simulated drone from A to B while avoiding fixed obstacles, then document the pipeline.
+这个仓库原先混放了多个互不相关的项目，现已拆分为独立仓库。
 
-## Status
-- [x] Environment setup
-- [ ] Simulation takeoff
-- [ ] Path planning (A* or RRT)
-- [ ] Path following
-- [ ] Demo + README polish
+## 项目已迁移至
 
-## Quick Start (No external dependencies)
-Run a minimal A* path planning demo in a 2D grid:
+| 项目 | 仓库 |
+|------|------|
+| Drone Path Planning + PID | https://github.com/YouknowwhoA/drone-path-planning |
+| ODE HW7 (Hodgkin-Huxley) | https://github.com/YouknowwhoA/ode-hw7 |
+| Genspark Retail Chat | https://github.com/YouknowwhoA/Genspark_retail |
 
-```bash
-python3 src/astar_demo.py
+## 本地目录（推荐）
+
+```text
+~/Documents/Drone/
+├── drone-path-planning/   ← 独立 clone
+├── ode-hw7/               ← 独立 clone
+├── genspark-retail/       ← 独立 clone
+└── zdisalone/             ← 本归档说明（可选保留）
 ```
 
-Animate the path and export waypoints:
-
-```bash
-python3 src/astar_animate.py
-```
-
-Random map + random tie-break (path varies each run):
-
-```bash
-python3 src/astar_animate.py --mode frames --random-map --random-tie-break --obstacle 0.25
-```
-
-Smoother motion (denser + smoothed path):
-
-```bash
-python3 src/astar_animate.py --mode frames --random-map --random-tie-break --obstacle 0.25 --interp 4 --smooth-rounds 2 --dt 0.2 --vmax 1.5 --amax 1.0
-```
-
-Realtime replan demo with a moving obstacle:
-
-```bash
-python3 src/astar_animate.py --dynamic-obs --delay 0.2 --replan-every 3
-```
-
-PID path tracking (control loop following the planned path):
-
-```bash
-python3 src/astar_animate.py --mode frames --random-map --random-tie-break --obstacle 0.25 --interp 4 --smooth-rounds 2 --pid-follow --kp 1.2 --kd 0.4 --ki 0.0
-```
+本仓库不再维护项目代码，请使用上方各独立仓库。
